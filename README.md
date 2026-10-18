@@ -1,160 +1,60 @@
-# CodeT5p-220M Fine-Tuned for Code Generation 🚀
+# CodeT5+ 220M: a code-generation fine-tuning experiment
 
-This repository contains the Jupyter Notebook and training pipeline for
-fine-tuning **Salesforce's `codet5p-220m`** model to generate **Python
-code from natural language descriptions**.
+**Completed learning experiment · retired from active development**
 
-The project leverages **Quantized LoRA (QLoRA)** and
-**Parameter-Efficient Fine-Tuning (PEFT)** to efficiently train the
-model on consumer-grade hardware while maintaining high performance.
+This repository preserves a 2024 notebook exploring LoRA and 4-bit fine-tuning of Salesforce's CodeT5+ 220M on Python description/code pairs. It records an early model-adaptation experiment, with published artifacts and unresolved methodology and reproducibility questions. There is no active development roadmap or ongoing support commitment.
 
-The pipeline is built using the **Hugging Face ecosystem**
-(`transformers`, `peft`, `trl`, and `datasets`).
+The [historical notebook](fine-tuning-project.ipynb) is preserved unchanged. The [published Hugging Face repository](https://huggingface.co/LonlyDWolf/CodeT5p-220M-For-Code-Generation) contains model and adapter files, but no reported evaluation establishes improved code generation over the base model. This is not presented as a validated code-generation product or a ready-to-run training pipeline.
 
-------------------------------------------------------------------------
+- [Technical retrospective](docs/TECHNICAL_RETROSPECTIVE.md): what the available evidence supports and what remains unresolved.
+- [Proposed Hugging Face model card](docs/MODEL_CARD.md): a local draft for review; adding this file does not update the Hub.
 
-# 🌟 Project Highlights
+## Recorded experiment configuration
 
--   **Base Model:** `Salesforce/codet5p-220m`
--   **Dataset:** `codeparrot/xlcost-text-to-code` (Python program-level
-    split)
--   **Training Method:** Supervised Fine-Tuning (SFT) using
-    `trl.SFTTrainer`
--   **Efficiency:** 4-bit quantization via `bitsandbytes` (NF4 format)
-    and LoRA targeting attention weights
--   **Tracking:** Integration with **Weights & Biases (W&B)** for
-    experiment tracking
--   **Final Model:** Available on Hugging Face\
-    `LonlyDWolf/CodeT5p-220M-For-Code-Generation`
+These are settings in the notebook, not independently verified measurements of a completed run.
 
-------------------------------------------------------------------------
+| Area               | Recorded configuration                                                                                       |
+| ------------------ | ------------------------------------------------------------------------------------------------------------ |
+| Base model         | `Salesforce/codet5p-220m`, loaded as `T5ForConditionalGeneration`                                            |
+| Data               | `codeparrot/xlcost-text-to-code`, `Python-program-level`                                                     |
+| Training selection | `train[:5%]`: the first 5% of the training split                                                             |
+| Validation         | Validation split passed to the trainer; no evaluation schedule, explicit evaluation call or results recorded |
+| Training budget    | 100 optimizer steps; batch size 2; gradient accumulation 8                                                   |
+| Learning rate      | `2e-4`, constant schedule, warmup ratio `0.03`                                                               |
+| LoRA               | Rank 8, alpha 16, dropout 0.1, targets `q`, `k`, `v`, `o`                                                    |
+| PEFT task          | `CAUSAL_LM`; this needs review for the encoder-decoder model                                                 |
+| Quantization       | 4-bit NF4, float16 compute via bitsandbytes                                                                  |
+| Trainer/input      | TRL `SFTTrainer`, packing enabled; description and reference code concatenated into one string               |
 
-# 🛠️ Requirements & Installation
+The [dataset card](https://huggingface.co/datasets/codeparrot/xlcost-text-to-code) describes serialized code containing `NEW_LINE`, `INDENT` and `DEDENT` markers. The notebook does not convert that representation back into executable Python.
 
-The notebook is designed to run in a **GPU-accelerated environment**
-such as:
+## Evidence and limitations
 
--   Kaggle
--   Google Colab
--   Local CUDA setup
+A documentation review on **18 October 2026** examined source commit [`4dedaf2`](https://github.com/lonlydwolf/CodeT5p-220m-Finetuned-For-Code-Generation/commit/4dedaf2b97d6b517a2caac84447450ead1960d3f) and [Hub revision `141a2d4`](https://huggingface.co/LonlyDWolf/CodeT5p-220M-For-Code-Generation/tree/141a2d4e5c9d471082d1c7d59e87bd943a8aae6e).
 
-Install the required dependencies:
+- **Publication is verified; performance is not.** The Hub has model/adapter files and configurations. The notebook has no saved execution outputs, and the published model card has no evaluation results. Missing logs do not prove that training failed or never occurred.
+- **The training objective needs investigation.** CodeT5+ 220M is an encoder-decoder model, while the notebook uses a causal-LM task setting and packs description-plus-answer text. With the contemporaneous TRL behavior inspected in the review, that places reference answers in encoder inputs while reproducing the same sequence as labels. The exact historical TRL version is unknown; this is a material methodology concern, not proof of a failed training run.
+- **The export is not documented accurately as unquantized FP32.** The reload/merge cell still supplies a quantization configuration, and the published `config.json` retains 4-bit bitsandbytes settings. Model and adapter files coexist; a fresh-environment loading path and exact artifact lineage have not been validated.
+- **Reproduction is incomplete.** Most dependencies are unpinned, paths are Kaggle-specific, and authentication setup is incomplete. The intermediate `LonlyDWolf/output` reference was not accessible without authentication during review. Its absence from a public request does not establish deletion.
 
-``` bash
-pip install -U transformers peft trl accelerate evaluate datasets==2.16 nltk rouge_score
-pip install -i https://pypi.org/simple/ bitsandbytes wandb
-```
+No training, model-weight download, inference run or generated-code execution was performed in that review. There are no substantiated claims here about model quality, memory savings, latency or improvement over the base model.
 
-------------------------------------------------------------------------
+## Historical environment
 
-# 🔑 Environment Setup
+The published model card records the following versions:
 
-This notebook requires authentication with **Hugging Face** and
-**Weights & Biases**.
+| Package      | Recorded version |
+| ------------ | ---------------- |
+| PEFT         | 0.10.0           |
+| Transformers | 4.39.2           |
+| PyTorch      | 2.1.2            |
+| Datasets     | 2.16.0           |
+| Tokenizers   | 0.15.2           |
 
-⚠️ **Do not hardcode tokens in the notebook.**
+The notebook metadata identifies Python 3.10.13. These fragments are not a complete tested environment: the TRL, bitsandbytes, CUDA and hardware versions for the historical run are not established. Installing the latest libraries is not a substitute for reconstructing that environment.
 
-Use environment variables or a `.env` file instead:
+No current quickstart is offered. A future fork should first validate preprocessing, task/model compatibility and artifact loading on a small batch, then compare against the base model on held-out data before spending compute on retraining. See the [retrospective](docs/TECHNICAL_RETROSPECTIVE.md#what-a-future-experiment-should-establish).
 
-``` bash
-HF_TOKEN=your_huggingface_token
-WANDB_API_KEY=your_wandb_key
-```
+## License information
 
-------------------------------------------------------------------------
-
-# 🧠 Training Details
-
-## Prompt Formatting
-
-The model is trained using a **structured prompt format** to clearly
-separate the user instruction from the generated code output.
-
-    ### USER: {natural_language_description}
-    ### ASSISTANT: {python_code}
-
-------------------------------------------------------------------------
-
-## LoRA Configuration
-
-We use **Parameter-Efficient Fine-Tuning (PEFT)** to train adapters
-instead of the full model weights, drastically reducing memory usage.
-
-  Parameter                  Value
-  -------------------------- ------------------------
-  Rank (`r`)                 8
-  Alpha (`lora_alpha`)       16
-  Target Modules             `["q", "k", "v", "o"]`
-  Dropout (`lora_dropout`)   0.1
-  Bias                       none
-  Task Type                  `CAUSAL_LM`
-
-------------------------------------------------------------------------
-
-## Quantization Configuration
-
-To fit the model into limited VRAM, the base model is loaded in **4-bit
-precision**.
-
-  Setting         Value
-  --------------- -----------------
-  Load in 4-bit   True
-  Compute Dtype   `torch.float16`
-  Quant Type      `nf4`
-
-------------------------------------------------------------------------
-
-# 📦 Model Export & Merging Workflow
-
-The notebook includes the **complete end-to-end workflow**:
-
-1.  **Training** -- Supervised fine-tuning of the LoRA adapter weights.
-2.  **Saving** -- Exporting the adapter model to a local directory or
-    Hugging Face Hub.
-3.  **Reloading** -- Loading the base `codet5p` model in **FP32
-    (unquantized)**.
-4.  **Merging** -- Injecting LoRA weights into the base model using
-    `merge_and_unload()`.
-5.  **Publishing** -- Pushing the final standalone merged model to the
-    **Hugging Face Hub**.
-
-------------------------------------------------------------------------
-
-# 💻 Quickstart: Using the Fine-Tuned Model
-
-You can use the merged model directly with the **Hugging Face
-`transformers` library**.
-
-``` python
-import torch
-from transformers import AutoTokenizer, T5ForConditionalGeneration
-
-tokenizer = AutoTokenizer.from_pretrained("Salesforce/codet5p-220m")
-model = T5ForConditionalGeneration.from_pretrained(
-    "LonlyDWolf/CodeT5p-220M-For-Code-Generation",
-    torch_dtype=torch.float32,
-    device_map="auto"
-)
-
-instruction = "Write a Python function to calculate the factorial of a given number."
-prompt = f"### USER: {instruction}\n### ASSISTANT: "
-
-inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
-outputs = model.generate(**inputs, max_length=256)
-
-generated_code = tokenizer.decode(outputs[0], skip_special_tokens=True)
-print(generated_code)
-```
-
-------------------------------------------------------------------------
-
-# 📝 License
-
-This project is **open-source**.
-
-Please ensure compliance with the licenses of:
-
--   `Salesforce/codet5p-220m`
--   `codeparrot/xlcost-text-to-code`
-
-when using or distributing this code.
+This code repository currently has no standalone license file. The [published model card](https://huggingface.co/LonlyDWolf/CodeT5p-220M-For-Code-Generation) declares BSD-3-Clause; the [base-model](https://huggingface.co/Salesforce/codet5p-220m) and [dataset](https://huggingface.co/datasets/codeparrot/xlcost-text-to-code) cards document their own terms. This documentation closeout does not assign a new license or change those declarations.
